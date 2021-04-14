@@ -8,11 +8,6 @@ import org.apache.thrift.transport.TTransport;
 
 import server.FileSystem;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.util.ArrayList;
-
 import Helper.Logger;
 
 public class Client {

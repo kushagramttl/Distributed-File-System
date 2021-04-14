@@ -17,12 +17,11 @@ public class Server {
   public static void main(String[] args) {
 
     if (args.length != 1) {
-      System.out.print("usage <port-number> <coordinator-port>\n");
+      System.out.print("usage <port-number>\n");
       Runtime.getRuntime().halt(0); // to not trigger shutdown hook
     }
     try {
       port = Integer.parseInt(args[0]);
-
     } catch (NumberFormatException e) {
       System.out.print("Please provide an Integer as port number\n");
       Runtime.getRuntime().halt(0); // to not trigger shutdown hook

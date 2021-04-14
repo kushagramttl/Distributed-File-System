@@ -1,3 +1,5 @@
+namespace java chunk
+
 typedef i32 int
 
 service Chunk{

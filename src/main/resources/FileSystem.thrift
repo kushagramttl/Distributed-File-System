@@ -1,3 +1,5 @@
+namespace java server
+
 typedef i32 int
 
 service FileSystem{
