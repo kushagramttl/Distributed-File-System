@@ -3,12 +3,19 @@ package client;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocol;
+import org.apache.thrift.transport.TByteBuffer;
 import org.apache.thrift.transport.TSocket;
 import org.apache.thrift.transport.TTransport;
 
 import server.FileSystem;
 
 import Helper.Logger;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 public class Client {
 
@@ -31,7 +38,12 @@ public class Client {
       TProtocol protocol = new TBinaryProtocol(transport);
       fileSystemClient = new FileSystem.Client(protocol);
 
-      fileSystemClient.uploadFile("Trial.txt", null);
+      ByteBuffer binaryArray;
+      // TODO : Make user input absolute path.
+      binaryArray = ByteBuffer.wrap(Files.readAllBytes(Paths.get("/home/soufianej/Documents/Courses/Building-scalable-distributed-systems/Projects/final-project/DistributedStorage/src/main/java/client/dummy.txt")));
+
+//      fileSystemClient.uploadFile("dummy.txt", binaryArray);
+      fileSystemClient.getFile("dummy.txt");
 
       Runtime.getRuntime().addShutdownHook(new Thread(() -> {
         transport.close();
@@ -39,8 +51,9 @@ public class Client {
         System.out.println("Client is shutting down, closing all sockets!");
       }));
 
-    } catch (TException e) {
+    } catch (TException | IOException e) {
       logger.logErr("Failure on the server side: " + e.getMessage());
+      e.printStackTrace();
       System.exit(0); // triggers shutdown hook
     }
   }
