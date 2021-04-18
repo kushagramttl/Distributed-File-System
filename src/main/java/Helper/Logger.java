@@ -20,7 +20,7 @@ public class Logger {
   public Logger(String owner) {
     this.name = owner;
     try {
-      output = new File(String.format("[%s] %s.txt", owner, getCurrentTime()));
+      output = new File(String.format("logs/[%s] %s.txt", owner, getCurrentTime()));
       if (output.createNewFile())
         logInfo("Started new log file of name: " + output.getName());
     } catch (IOException e) {

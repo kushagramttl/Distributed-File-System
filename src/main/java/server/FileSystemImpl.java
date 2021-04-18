@@ -2,6 +2,7 @@ package server;
 
 import static java.util.Arrays.asList;
 
+import chunk.Chunk;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
@@ -9,6 +10,7 @@ import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
+import org.apache.thrift.TApplicationException;
 import org.apache.thrift.TException;
 
 import java.io.File;
@@ -17,12 +19,17 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.logging.Filter;
 
 import Helper.Logger;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.protocol.TProtocol;
+import org.apache.thrift.transport.TSocket;
+import org.apache.thrift.transport.TTransport;
 import org.bson.BsonBinary;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -42,6 +49,14 @@ public class FileSystemImpl implements FileSystem.Iface {
     private Logger logger;
 
     /**
+     * The client that connects to the chunk server.
+     */
+    private Chunk.Client chunkClient;
+
+
+    private String hostName;
+
+    /**
      * Creates a new instance of the FileSystemImpl
      *
      * @param logger The logger for logging.
@@ -52,40 +67,43 @@ public class FileSystemImpl implements FileSystem.Iface {
 
     @Override
     public ByteBuffer getFile(String name) throws TException {
-        String connectionString = System.getProperty("mongodb.uri");
+        try (TTransport transport = new TSocket("localhost", 8000)) {
+            transport.open();
 
-        try (MongoClient mongoClient = MongoClients.create(connectionString)) {
-            MongoDatabase db = mongoClient.getDatabase("FileSystem");
-            MongoCollection<Document> gradesCollection = db.getCollection("Files");
+            TProtocol protocol = new TBinaryProtocol(transport);
+            chunkClient = new Chunk.Client(protocol);
 
-            Document file = gradesCollection.find(Filters.eq("filename", name)).first();
-            String filename = (String) file.get("filename");
-            Binary data = (Binary) file.get("data");
+            ByteBuffer buffer = chunkClient.getFile(name);
 
-            try (FileOutputStream stream = new FileOutputStream(filename)) {
-                stream.write(data.getData());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                transport.close();
+
+                System.out.println("Client is shutting down, closing all sockets!");
+            }));
+
+
+            return buffer;
+
         }
-        return null;
     }
 
     @Override
     public void uploadFile(String name, ByteBuffer file) throws TException {
         this.logger.logInfo("Name received: " + name);
 
-        String connectionString = System.getProperty("mongodb.uri");
+        try (TTransport transport = new TSocket("localhost", 8000)) {
+            transport.open();
 
-        try (MongoClient mongoClient = MongoClients.create(connectionString)) {
-            MongoDatabase db = mongoClient.getDatabase("FileSystem");
-            MongoCollection<Document> gradesCollection = db.getCollection("Files");
+            TProtocol protocol = new TBinaryProtocol(transport);
+            chunkClient = new Chunk.Client(protocol);
 
-            Document data = new Document("_id", new ObjectId());
-            data.append("filename", name)
-                    .append("data", new Binary(file.array()));
+            chunkClient.uploadFile(name, file);
 
-            gradesCollection.insertOne(data);
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                transport.close();
+
+                System.out.println("Client is shutting down, closing all sockets!");
+            }));
         }
     }
 
@@ -93,13 +111,19 @@ public class FileSystemImpl implements FileSystem.Iface {
     public void updateFile(String name, ByteBuffer file) throws TException {
         this.logger.logInfo("Name received in update operation: " + name);
 
-        String connectionString = System.getProperty("mongodb.uri");
+        try (TTransport transport = new TSocket("localhost", 8000)) {
+            transport.open();
 
-        try (MongoClient mongoClient = MongoClients.create(connectionString)) {
-            MongoDatabase db = mongoClient.getDatabase("FileSystem");
-            MongoCollection<Document> gradesCollection = db.getCollection("Files");
+            TProtocol protocol = new TBinaryProtocol(transport);
+            chunkClient = new Chunk.Client(protocol);
 
-            gradesCollection.updateOne(Filters.eq("filename", name), Updates.set("data", new Binary(file.array())));
+            chunkClient.updateFile(name, file);
+
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                transport.close();
+
+                System.out.println("Client is shutting down, closing all sockets!");
+            }));
         }
     }
 
@@ -107,15 +131,19 @@ public class FileSystemImpl implements FileSystem.Iface {
     public void deleteFile(String name) throws TException {
         this.logger.logInfo("Name received in delete operation: " + name);
 
-        String connectionString = System.getProperty("mongodb.uri");
+        try (TTransport transport = new TSocket("localhost", 8000)) {
+            transport.open();
 
-        try (MongoClient mongoClient = MongoClients.create(connectionString)) {
-            MongoDatabase db = mongoClient.getDatabase("FileSystem");
-            MongoCollection<Document> gradesCollection = db.getCollection("Files");
+            TProtocol protocol = new TBinaryProtocol(transport);
+            chunkClient = new Chunk.Client(protocol);
 
-            DeleteResult result = gradesCollection.deleteOne(Filters.eq("filename", name));
+            chunkClient.deleteFile(name);
 
-            System.out.println(result);
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                transport.close();
+
+                System.out.println("Client is shutting down, closing all sockets!");
+            }));
         }
     }
 }

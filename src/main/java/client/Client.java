@@ -1,5 +1,6 @@
 package client;
 
+import org.apache.thrift.TApplicationException;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocol;
@@ -12,6 +13,7 @@ import server.FileSystem;
 import Helper.Logger;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
@@ -44,8 +46,16 @@ public class Client {
               Paths.get("/Users/kushagramittal/Documents/CS6650-Saripalli/final-project/DistributedFileSystem/src/main/java/client/Test.txt")));
 
 //      fileSystemClient.updateFile("Test.txt", binaryArray);
-      fileSystemClient.getFile("dummy.txt");
-//        fileSystemClient.deleteFile("Test.txt");
+//      ByteBuffer data = fileSystemClient.getFile("Test.txt");
+//
+//      try (FileOutputStream stream = new FileOutputStream("Test.txt")) {
+//        stream.write(data.array());
+//      } catch (IOException e) {
+//        e.printStackTrace();
+//      }
+
+
+        fileSystemClient.deleteFile("Test.txt");
 
       Runtime.getRuntime().addShutdownHook(new Thread(() -> {
         transport.close();
@@ -53,6 +63,8 @@ public class Client {
         System.out.println("Client is shutting down, closing all sockets!");
       }));
 
+    } catch (TApplicationException exception) {
+      logger.logErr("Error received from server: " + exception.getMessage());
     } catch (TException | IOException e) {
       logger.logErr("Failure on the server side: " + e.getMessage());
       e.printStackTrace();
