@@ -40,10 +40,12 @@ public class Client {
 
       ByteBuffer binaryArray;
       // TODO : Make user input absolute path.
-      binaryArray = ByteBuffer.wrap(Files.readAllBytes(Paths.get("/home/soufianej/Documents/Courses/Building-scalable-distributed-systems/Projects/final-project/DistributedStorage/src/main/java/client/dummy.txt")));
+      binaryArray = ByteBuffer.wrap(Files.readAllBytes(
+              Paths.get("/Users/kushagramittal/Documents/CS6650-Saripalli/final-project/DistributedFileSystem/src/main/java/client/Test.txt")));
 
-//      fileSystemClient.uploadFile("dummy.txt", binaryArray);
+//      fileSystemClient.updateFile("Test.txt", binaryArray);
       fileSystemClient.getFile("dummy.txt");
+//        fileSystemClient.deleteFile("Test.txt");
 
       Runtime.getRuntime().addShutdownHook(new Thread(() -> {
         transport.close();
