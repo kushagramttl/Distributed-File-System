@@ -1,18 +1,16 @@
 package client;
 
-import org.apache.thrift.TApplicationException;
 import org.apache.thrift.TException;
-import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocol;
-import org.apache.thrift.transport.TByteBuffer;
 import org.apache.thrift.transport.TSocket;
 import org.apache.thrift.transport.TTransport;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.TApplicationException;
 
 import server.FileSystem;
 
 import Helper.Logger;
 
-import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -43,9 +41,9 @@ public class Client {
       ByteBuffer binaryArray;
       // TODO : Make user input absolute path.
       binaryArray = ByteBuffer.wrap(Files.readAllBytes(
-              Paths.get("/Users/kushagramittal/Documents/CS6650-Saripalli/final-project/DistributedFileSystem/src/main/java/client/Test.txt")));
+              Paths.get("/home/soufianej/Documents/Courses/Building-scalable-distributed-systems/Projects/final-project/DistributedStorage/src/main/java/client/Test.txt")));
 
-//      fileSystemClient.updateFile("Test.txt", binaryArray);
+      fileSystemClient.uploadFile("Test3.txt", binaryArray);
 //      ByteBuffer data = fileSystemClient.getFile("Test.txt");
 //
 //      try (FileOutputStream stream = new FileOutputStream("Test.txt")) {
@@ -55,7 +53,7 @@ public class Client {
 //      }
 
 
-        fileSystemClient.deleteFile("Test.txt");
+//        fileSystemClient.deleteFile("Test.txt");
 
       Runtime.getRuntime().addShutdownHook(new Thread(() -> {
         transport.close();

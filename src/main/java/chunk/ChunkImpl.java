@@ -53,9 +53,9 @@ public class ChunkImpl implements Chunk.Iface {
         try (MongoClient mongoClient = MongoClients.create(connectionString)) {
             MongoDatabase db = mongoClient.getDatabase("FileSystem");
 
-            MongoCollection<Document> gradesCollection = db.getCollection(this.collectionName);
+            MongoCollection<Document> collection = db.getCollection(this.collectionName);
 
-            Document file = gradesCollection.find(Filters.eq("filename", name)).first();
+            Document file = collection.find(Filters.eq("filename", name)).first();
 
             if (file == null)
                 throw new TApplicationException("File not found");
@@ -84,9 +84,9 @@ public class ChunkImpl implements Chunk.Iface {
     public ByteBuffer getMetadata() throws TException {
         try (MongoClient mongoClient = MongoClients.create(connectionString)) {
             MongoDatabase db = mongoClient.getDatabase("FileSystem");
-            MongoCollection<Document> gradesCollection = db.getCollection("Files");
+            MongoCollection<Document> collection = db.getCollection("Files");
 
-            FindIterable<Document> docs = gradesCollection.find();
+            FindIterable<Document> docs = collection.find();
 
             for (Document d :
                     docs) {
@@ -99,16 +99,15 @@ public class ChunkImpl implements Chunk.Iface {
 
     @Override
     public void uploadFile(String name, ByteBuffer file) throws TException {
-
         try (MongoClient mongoClient = MongoClients.create(connectionString)) {
             MongoDatabase db = mongoClient.getDatabase("FileSystem");
-            MongoCollection<Document> gradesCollection = db.getCollection(this.collectionName);
+            MongoCollection<Document> collection = db.getCollection(this.collectionName);
 
             Document data = new Document("_id", new ObjectId());
             data.append("filename", name)
                     .append("data", new Binary(file.array()));
 
-            gradesCollection.insertOne(data);
+            collection.insertOne(data);
         }
     }
 
@@ -116,9 +115,9 @@ public class ChunkImpl implements Chunk.Iface {
     public void updateFile(String name, ByteBuffer file) throws TException {
         try (MongoClient mongoClient = MongoClients.create(connectionString)) {
             MongoDatabase db = mongoClient.getDatabase("FileSystem");
-            MongoCollection<Document> gradesCollection = db.getCollection(this.collectionName);
+            MongoCollection<Document> collection = db.getCollection(this.collectionName);
 
-            gradesCollection.updateOne(Filters.eq("filename", name), Updates.set("data", new Binary(file.array())));
+            collection.updateOne(Filters.eq("filename", name), Updates.set("data", new Binary(file.array())));
         }
     }
 }
