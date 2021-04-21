@@ -7,4 +7,5 @@ service FileSystem{
     void uploadFile(1:string name, 2:binary file),
     void updateFile(1:string name, 2:binary file),
     void deleteFile(1:string name),
+    bool registerChunk(1:int port, 2:int replicaPort),
 }
