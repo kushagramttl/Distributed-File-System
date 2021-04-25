@@ -38,7 +38,6 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
     /**
      * Variables related to paxos prepare, accept and learn
      */
-
     private double maxRoundIdentifier;
     private int majority;
     private Map<Double, variableCollection> trackerObject;
@@ -330,6 +329,71 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
         return toReturn;
     }
 
+
+    public String paxosExampleMethod(String message){
+        logger.logInfo("INSIDE EXAMPLE METHOD" );
+        logger.logInfo("INSIDE THE THREAD "+ Thread.currentThread().getId());
+
+        double paxosIdentifier = maxRoundIdentifier + 1;
+        trackerObject.put(paxosIdentifier, new variableCollection());
+
+        logger.logInfo("maxRoundIdentifier" + " " + maxRoundIdentifier);
+        // Prepare //
+
+        // Call to the local acceptor for prepare
+        String responseFromAcceptor = PREPARE(paxosIdentifier);
+        String[] responses = responseFromAcceptor.split(":");
+        String responseType = responses[0];
+        String responseValue = responses[1];
+        if(responseType.equals("PROMISE")) {
+            trackerObject.get(maxRoundIdentifier).countPromises++;
+        }
+
+
+        // Call to the rest of them
+        for(FunctionalityOfPaxosStore.Client paxosServer : paxosServers) {
+            try {
+                //  Map is needed for differentiating variables assigned to two different variables
+                responseFromAcceptor = paxosServer.PREPARE(paxosIdentifier);
+                responses = responseFromAcceptor.split(":");
+                responseType = responses[0];
+                responseValue = responses[1];
+
+                logger.logInfo("String responseType = responses[0]" + responseType);
+                if(responseType.equals("PROMISE")) {
+
+                    trackerObject.get(maxRoundIdentifier).countPromises++;
+                }
+                else {
+                    // Need to update the pid and try again
+                    // Will code this later probably requires recursion
+                }
+            }
+            catch (TException e) {
+                e.printStackTrace();
+            }
+        }
+
+
+        logger.logInfo("trackerObject.get(paxosIdentifier).countPromises" + " "
+                + trackerObject.get(paxosIdentifier).countPromises);
+        // If promises form a  majority
+        if(trackerObject.get(paxosIdentifier).countPromises >= majority) {
+            logger.logInfo("TRYING TO CALL ACCEPTOR");
+            logger.logInfo("CALL TO THE LOCAL ACCEPTOR");
+            this.ACCEPT(paxosIdentifier, message);
+            for(FunctionalityOfPaxosStore.Client paxosServer : paxosServers) {
+                try {
+                    paxosServer.ACCEPT(paxosIdentifier, message);
+                }
+                catch (TException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        return "OPERATION:COMPLETED";
+    }
 
 
     @Override
