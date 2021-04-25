@@ -490,6 +490,7 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
 
 
     private String operation(String value) {
+        logger.logInfo("OPERATION COMPLETE");
         return "";
     }
 
