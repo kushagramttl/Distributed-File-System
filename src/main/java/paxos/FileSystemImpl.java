@@ -18,11 +18,32 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+
+
+class variableCollection {
+    public boolean proposal_accepted = false;
+    public double accepted_ID = -1;
+    public String accepted_VALUE = null;
+    public int countPromises = 0;
+    public int countAccepts = 0;
+}
+
+
 /**
  *
  */
 public class FileSystemImpl implements FileSystem.Iface, FunctionalityOfPaxosStore.Iface {
 
+
+    /**
+     * Variables related to paxos prepare, accept and learn
+     */
+
+    private double maxRoundIdentifier;
+    private int majority;
+    private Map<Double, variableCollection> trackerObject;
+    private List<FunctionalityOfPaxosStore.Client> paxosServers;
+    private int port;
 
 
 
@@ -53,6 +74,17 @@ public class FileSystemImpl implements FileSystem.Iface, FunctionalityOfPaxosSto
      * @param logger The logger for logging.
      */
     public FileSystemImpl(Logger logger) {
+
+
+        //
+        this.maxRoundIdentifier = 1 + Math.random();
+        // servers.size()/2 + 1; should be this if prvided with the connecting servers list
+        this.majority = 5;
+        this.trackerObject = new HashMap<Double, variableCollection>();
+        this.paxosServers = getServers(servers);
+
+
+
         this.logger = logger;
         this.fileLocator = new ConcurrentHashMap<>();
         this.loadTracker = new ConcurrentHashMap<>();
@@ -75,6 +107,57 @@ public class FileSystemImpl implements FileSystem.Iface, FunctionalityOfPaxosSto
             }
         }
     }
+
+    /**
+     * Method used to unmarshal the data related to the servers and create objects from it
+     * @param paxosServerIdentifiers
+     * @return
+     */
+    private List<FunctionalityOfPaxosStore.Client> getServers(List<ServerIdentifier> paxosServerIdentifiers) {
+
+        try {
+            Thread.sleep(10000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        List<FunctionalityOfPaxosStore.Client> clients = new ArrayList<FunctionalityOfPaxosStore.Client>();
+
+        log.logInfoMessage("Inside the functionality implementation paxosServers.size()" + paxosServerIdentifiers.size() );
+
+        for(int i = 0; i < paxosServerIdentifiers.size(); i++) {
+            if(paxosServerIdentifiers.get(i).getPort() != port) {
+                FunctionalityOfPaxosStore.Client paxosClient = null;
+                ServerIdentifier participant = paxosServerIdentifiers.get(i);
+
+
+                try {
+
+                    String host = participant.getHostname();
+                    int port = participant.getPort();
+                    TSocket transport = new TSocket(host, port);
+                    transport.open();
+                    TBinaryProtocol protocol = new TBinaryProtocol(transport);
+                    paxosClient = new FunctionalityOfPaxosStore.Client(protocol);
+                    clients.add(paxosClient);
+                }
+                catch (TTransportException e) {
+                    e.printStackTrace();
+                }
+
+            }
+
+
+            log.logInfoMessage("clients.size() " + clients.size());
+            log.logInfoMessage("clients.toString() " + clients.toString());
+
+
+
+        }
+
+        return clients;
+    }
+
+
 
     /**
      * Backs up both the data of the fileLocator and loadTracker maps in the database
