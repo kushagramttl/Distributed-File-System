@@ -1,4 +1,4 @@
-package paxos;
+package paxos.master;
 
 import Helper.Logger;
 import chunk.Chunk;
@@ -32,7 +32,7 @@ class variableCollection {
 /**
  *
  */
-public class FileSystemImpl implements FileSystem.Iface, FunctionalityOfPaxosStore.Iface {
+public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
 
 
     /**
@@ -73,13 +73,19 @@ public class FileSystemImpl implements FileSystem.Iface, FunctionalityOfPaxosSto
      *
      * @param logger The logger for logging.
      */
-    public FileSystemImpl(Logger logger) {
+    public FileSystemPaxosImpl(Logger logger) {
 
+        this.logger = logger;
+        this.fileLocator = new ConcurrentHashMap<>();
+        this.loadTracker = new ConcurrentHashMap<>();
+        this.replicaTracker = new ConcurrentHashMap<>();
+        retrieveMetadata();
+    }
 
-        //
+    public FileSystemPaxosImpl(Logger logger, List<ServerIdentifier> servers) {
+
         this.maxRoundIdentifier = 1 + Math.random();
-        // servers.size()/2 + 1; should be this if prvided with the connecting servers list
-        this.majority = 5;
+        this.majority = servers.size()/2 + 1;
         this.trackerObject = new HashMap<Double, variableCollection>();
         this.paxosServers = getServers(servers);
 
@@ -90,6 +96,7 @@ public class FileSystemImpl implements FileSystem.Iface, FunctionalityOfPaxosSto
         this.loadTracker = new ConcurrentHashMap<>();
         this.replicaTracker = new ConcurrentHashMap<>();
         retrieveMetadata();
+
     }
 
     // TODO IMPORTANT : CATCH EXCEPTIONS HERE
@@ -122,7 +129,7 @@ public class FileSystemImpl implements FileSystem.Iface, FunctionalityOfPaxosSto
         }
         List<FunctionalityOfPaxosStore.Client> clients = new ArrayList<FunctionalityOfPaxosStore.Client>();
 
-        log.logInfoMessage("Inside the functionality implementation paxosServers.size()" + paxosServerIdentifiers.size() );
+        logger.logInfo("Inside the functionality implementation paxosServers.size()" + paxosServerIdentifiers.size() );
 
         for(int i = 0; i < paxosServerIdentifiers.size(); i++) {
             if(paxosServerIdentifiers.get(i).getPort() != port) {
@@ -147,8 +154,8 @@ public class FileSystemImpl implements FileSystem.Iface, FunctionalityOfPaxosSto
             }
 
 
-            log.logInfoMessage("clients.size() " + clients.size());
-            log.logInfoMessage("clients.toString() " + clients.toString());
+            logger.logInfo("clients.size() " + clients.size());
+            logger.logInfo("clients.toString() " + clients.toString());
 
 
 
@@ -178,6 +185,7 @@ public class FileSystemImpl implements FileSystem.Iface, FunctionalityOfPaxosSto
             }
         }
     }
+
 
     @Override
     public ByteBuffer getFile(String name) throws TException {
@@ -218,7 +226,6 @@ public class FileSystemImpl implements FileSystem.Iface, FunctionalityOfPaxosSto
 
     @Override
     public void uploadFile(String name, ByteBuffer file) throws TException {
-
 
         Map.Entry<Integer, Integer> chunkServer = Collections.min(loadTracker.entrySet(), new Comparator<Map.Entry<Integer, Integer>>() {
             public int compare(Map.Entry<Integer, Integer> entry1, Map.Entry<Integer, Integer> entry2) {
@@ -324,19 +331,11 @@ public class FileSystemImpl implements FileSystem.Iface, FunctionalityOfPaxosSto
     }
 
 
-    // Methods need for paxos
-
-    public void dummyFunction() {
-
-    }
-
-
-
 
     @Override
     public String PREPARE(double paxosIdentifier){
 
-        log.logInfoMessage("INSIDER PREPARE");
+        logger.logInfo("INSIDER PREPARE");
         // Data structure declaration step as the acceptor may not have initialize the values
         if(!trackerObject.containsKey(paxosIdentifier)) {
             trackerObject.put(paxosIdentifier,new variableCollection());
@@ -370,8 +369,8 @@ public class FileSystemImpl implements FileSystem.Iface, FunctionalityOfPaxosSto
     public String ACCEPT(double paxosIdentifier, String value){
 
 
-        log.logInfoMessage("INSIDER ACCEPT");
-        log.logInfoMessage("VALUE TO BE ACCEPTED " + value);
+        logger.logInfo("INSIDER ACCEPT");
+        logger.logInfo("VALUE TO BE ACCEPTED " + value);
 
         if(paxosIdentifier == this.maxRoundIdentifier) {
             this.trackerObject.get(paxosIdentifier).proposal_accepted = true;
@@ -405,21 +404,12 @@ public class FileSystemImpl implements FileSystem.Iface, FunctionalityOfPaxosSto
 
     @Override
     public String LEARN(double paxosIdentifier, String value){
-        // Updates the acceptance count
-        // this.acceptsReceived++;
 
-
-        log.logInfoMessage("INSIDER LEARN");
-        log.logInfoMessage("VALUE TO BE LEARNED " + value);
+        logger.logInfo("INSIDER LEARN");
+        logger.logInfo("VALUE TO BE LEARNED " + value);
 
         trackerObject.get(paxosIdentifier).countAccepts++;
-
-//        log.logInfoMessage("trackerObject.get(paxosIdentifier).countAccepts++; " + trackerObject.get(paxosIdentifier).countAccepts++);
-
-        // And then calls the check value which will fail for the rest of them
         if(this.trackerObject.get(paxosIdentifier).countAccepts == majority) {
-            // Need to get the value in format GET:KEY or PUT:KEY:VALUE or DELETE:KEY:VALUE
-            // Need to set the pid now so that history cannot be changed
             this.operation(value);
             return "LEARNED";
         }
@@ -439,23 +429,6 @@ public class FileSystemImpl implements FileSystem.Iface, FunctionalityOfPaxosSto
         return "";
     }
 
-
-    // Unneccessary methods wil  be removed soon
-    @Override
-    public String GET(String key) throws TException {
-
-        return null;
-    }
-
-    @Override
-    public String PUT(String key, String value) throws TException {
-        return null;
-    }
-
-    @Override
-    public String DELETE(String key) throws TException {
-        return null;
-    }
 
 
 }

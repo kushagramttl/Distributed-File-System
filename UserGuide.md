@@ -2,6 +2,13 @@
 User Manual
 ---
 
+##How to compile a thrift file:
+
+Go to the location of the file and do
+thrift -r --gen java <Name of thrift file>
+
+Example:
+thrift -r --gen java FileSystemPaxos.thrift
 
 
 Report Link
