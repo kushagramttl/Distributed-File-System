@@ -1,7 +1,15 @@
-
-
 Paxos Flow
 ---
 
-- The main method will provide the list of servers which are partnering master servers
+- The server class will provide the list of servers which are partner master servers to the FileSytem
 - It uses server identifier to structure the corresponding information about those servers
+- The file currently contains the example method for coordinating with the other servers
+- The maps or list currently used for managing the chunk server or other metadata need 
+to be consistent
+- Paxos in master server helps with that a commit on any one of the master servers
+will ensure that the rest of them also update their metadata
+- Once metadat is consistent or after the proposer in this case has achived the max consesnsu
+it will initiate the actual process that is push to the database or storage
+- Paxos is just used for ensuring consistency across all the master servers
+- As of now recovery is not supported, it is assumed that if a server dies it stays dead
+
