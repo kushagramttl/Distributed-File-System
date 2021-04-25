@@ -359,7 +359,6 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
                 responseType = responses[0];
                 responseValue = responses[1];
 
-                logger.logInfo("String responseType = responses[0]" + responseType);
                 if(responseType.equals("PROMISE")) {
 
                     trackerObject.get(maxRoundIdentifier).countPromises++;
@@ -375,8 +374,6 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
         }
 
 
-        logger.logInfo("trackerObject.get(paxosIdentifier).countPromises" + " "
-                + trackerObject.get(paxosIdentifier).countPromises);
         // If promises form a  majority
         if(trackerObject.get(paxosIdentifier).countPromises >= majority) {
             logger.logInfo("TRYING TO CALL ACCEPTOR");
