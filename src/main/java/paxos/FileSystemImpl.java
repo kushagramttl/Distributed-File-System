@@ -21,7 +21,10 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  *
  */
-public class FileSystemImpl implements FileSystem.Iface, PaxosFunctionality.Iface {
+public class FileSystemImpl implements FileSystem.Iface, FunctionalityOfPaxosStore.Iface {
+
+
+
 
     /**
      * The logger object.
@@ -40,9 +43,9 @@ public class FileSystemImpl implements FileSystem.Iface, PaxosFunctionality.Ifac
      *  loadTracker keeps track of chunk port numbers and the amount of files the chunks contain.
      *  replicaTracker keeps track of each chunk's active replicas.
      */
-    private Map<String, Integer> fileLocator;
-    private Map<Integer, Integer> loadTracker;
-    private Map<Integer, Set<Integer>> replicaTracker;
+        private Map<String, Integer> fileLocator;
+        private Map<Integer, Integer> loadTracker;
+        private Map<Integer, Set<Integer>> replicaTracker;
 
     /**
      * Creates a new instance of the FileSystemImpl
@@ -132,6 +135,8 @@ public class FileSystemImpl implements FileSystem.Iface, PaxosFunctionality.Ifac
 
     @Override
     public void uploadFile(String name, ByteBuffer file) throws TException {
+
+
         Map.Entry<Integer, Integer> chunkServer = Collections.min(loadTracker.entrySet(), new Comparator<Map.Entry<Integer, Integer>>() {
             public int compare(Map.Entry<Integer, Integer> entry1, Map.Entry<Integer, Integer> entry2) {
                 return entry1.getValue().compareTo(entry2.getValue());
@@ -235,18 +240,139 @@ public class FileSystemImpl implements FileSystem.Iface, PaxosFunctionality.Ifac
         return toReturn;
     }
 
+
+    // Methods need for paxos
+
+    public void dummyFunction() {
+
+    }
+
+
+
+
     @Override
-    public String PREPARE(String pid) throws TException {
+    public String PREPARE(double paxosIdentifier){
+
+        log.logInfoMessage("INSIDER PREPARE");
+        // Data structure declaration step as the acceptor may not have initialize the values
+        if(!trackerObject.containsKey(paxosIdentifier)) {
+            trackerObject.put(paxosIdentifier,new variableCollection());
+        }
+
+        if(paxosIdentifier <= this.maxRoundIdentifier) {
+            return "IGNORED:" + paxosIdentifier;
+        }
+        else {
+            this.maxRoundIdentifier = paxosIdentifier;
+
+            if(trackerObject.containsKey(paxosIdentifier)) {
+                if(trackerObject.get(paxosIdentifier).proposal_accepted) {
+                    double accepted_ID = trackerObject.get(paxosIdentifier).accepted_ID;
+                    String accepted_VALUE = trackerObject.get(paxosIdentifier).accepted_VALUE;
+                    return "PROMISE:"  + paxosIdentifier + ":" + accepted_ID + ":" + accepted_VALUE ;
+                }
+                else {
+                    return "PROMISE:"  + paxosIdentifier;
+                }
+
+            }
+            else {
+                return "PROMISE:"  + paxosIdentifier;
+            }
+        }
+
+    }
+
+    @Override
+    public String ACCEPT(double paxosIdentifier, String value){
+
+
+        log.logInfoMessage("INSIDER ACCEPT");
+        log.logInfoMessage("VALUE TO BE ACCEPTED " + value);
+
+        if(paxosIdentifier == this.maxRoundIdentifier) {
+            this.trackerObject.get(paxosIdentifier).proposal_accepted = true;
+            this.trackerObject.get(paxosIdentifier).accepted_ID = paxosIdentifier;
+            this.trackerObject.get(paxosIdentifier).accepted_VALUE = value;
+
+            LEARN(paxosIdentifier,value);
+            for(FunctionalityOfPaxosStore.Client paxosServer : paxosServers) {
+                try {
+
+                    paxosServer.LEARN(paxosIdentifier,value);
+
+                }
+                catch (TException e) {
+                    e.printStackTrace();
+                }
+            }
+
+
+            return "ACCEPTED " + paxosIdentifier;
+
+        }
+
+
+        else {
+            return "IGNORED";
+        }
+
+
+    }
+
+    @Override
+    public String LEARN(double paxosIdentifier, String value){
+        // Updates the acceptance count
+        // this.acceptsReceived++;
+
+
+        log.logInfoMessage("INSIDER LEARN");
+        log.logInfoMessage("VALUE TO BE LEARNED " + value);
+
+        trackerObject.get(paxosIdentifier).countAccepts++;
+
+//        log.logInfoMessage("trackerObject.get(paxosIdentifier).countAccepts++; " + trackerObject.get(paxosIdentifier).countAccepts++);
+
+        // And then calls the check value which will fail for the rest of them
+        if(this.trackerObject.get(paxosIdentifier).countAccepts == majority) {
+            // Need to get the value in format GET:KEY or PUT:KEY:VALUE or DELETE:KEY:VALUE
+            // Need to set the pid now so that history cannot be changed
+            this.operation(value);
+            return "LEARNED";
+        }
+        else if(this.trackerObject.get(paxosIdentifier).countAccepts > majority) {
+            return "IGNORED";
+        }
+        else {
+            // Ignore for the rest
+            return "IGNORED";
+        }
+
+    }
+
+
+
+    private String operation(String value) {
+        return "";
+    }
+
+
+    // Unneccessary methods wil  be removed soon
+    @Override
+    public String GET(String key) throws TException {
+
         return null;
     }
 
     @Override
-    public String ACCEPT(String pid, String value) throws TException {
+    public String PUT(String key, String value) throws TException {
         return null;
     }
 
     @Override
-    public String LEARN(String pid, String value) throws TException {
+    public String DELETE(String key) throws TException {
         return null;
     }
+
+
 }

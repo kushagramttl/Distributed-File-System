@@ -1,6 +1,8 @@
 namespace cpp com.thrift
 namespace java com.thrift
 
+
+
 service CoordinatorService {
 
     string PREPARE(1:string pid),
