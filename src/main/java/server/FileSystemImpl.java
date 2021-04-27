@@ -128,6 +128,8 @@ public class FileSystemImpl implements FileSystem.Iface {
 
 
             return buffer;
+        } catch (Exception e){
+            return null;
         }
     }
 

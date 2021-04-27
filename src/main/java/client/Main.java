@@ -19,7 +19,8 @@ public class Main {
                 Logger logger = new Logger("RPC Client (" + port + ")");
 
                 Client client = new Client(port, logger, hostName);
-                client.sendRequest();
+
+                client.acceptRequests();
 
             } else {
                 System.out.print("Please provide a valid hostname\n");
