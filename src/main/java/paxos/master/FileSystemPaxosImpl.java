@@ -314,7 +314,8 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
       }));
 
       backupMetadata();
-    } catch (TTransportException e) {
+    }
+    catch (TTransportException e) {
       e.printStackTrace();
     }
   }
@@ -352,20 +353,6 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
     amRequested = false;
 
 
-//        try {
-//            Thread.sleep(10000);
-//        }
-//        catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
-//
-//        if(amRequested && achievedConsensus) {
-//            uploadFileHelperMongo(name, ckey, cvalue, file);
-//        }
-
-
-//        flushIntegrationVariable();
-
 
   }
 
@@ -397,6 +384,8 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
   public void deleteFileHelper(String name, int chunkPort) {
     loadTracker.replace(chunkPort, loadTracker.get(chunkPort) - 1);
     fileLocator.remove(name);
+
+
     deleteFileHelperMongo(name, chunkPort);
 
   }
@@ -407,9 +396,6 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
       TProtocol protocol = new TBinaryProtocol(transport);
       chunkClient = new Chunk.Client(protocol);
       chunkClient.deleteFile(name);
-//            logger.logInfo("REQUEST - DELETE; CHUNKSERV => " + chunkPort + " - FILE => " + name);
-//            loadTracker.replace(chunkPort, loadTracker.get(chunkPort) - 1);
-//            fileLocator.remove(name);
       backupMetadata();
 
 
@@ -418,9 +404,11 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
 
         System.out.println("Client is shutting down, closing all sockets!");
       }));
-    } catch (TTransportException e) {
+    }
+    catch (TTransportException e) {
       e.printStackTrace();
-    } catch (TException e) {
+    }
+    catch (TException e) {
       e.printStackTrace();
     }
 
@@ -436,7 +424,7 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
     }
     int chunkPort = fileLocator.get(name);
 
-    /***************************************************************************/
+
 
     PaxosMessage message = new PaxosMessage();
     message.type = "DELETE";
@@ -445,7 +433,7 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
 
     proposerHelper(message.toString());
 
-    /***************************************************************************/
+
 
     amRequested = false;
 
@@ -506,34 +494,17 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
 
       try {
 
-
         responseFromAcceptor = paxosServer.PREPARE(paxosIdentifier);
         responses = responseFromAcceptor.split(":");
         responseType = responses[0];
 
         logger.logInfo("RESPONSE FOR THE PROMISE REQUEST TO THE SERVER " + responseFromAcceptor);
         if (responseType.equals("PROMISE")) {
-          // A way of tell that you received accepted_id and accepted_value along with your promise
-          if (responses.length == 4) {
-            // The acceptor previously accepted a value
-            logger.logInfo("AN ACCEPTED VALUE IS FOUND YOUR REQUEST");
             trackerObject.get(maxRoundIdentifier).countPromises++;
-
-//                        String received_accepted_id = responses[2];
-//                        String received_accepted_value = responses[3];
-//
-//                        message = received_accepted_value;
-//                        if(Float.parseFloat(received_accepted_id) > Float.parseFloat(highest_accepted_id)) {
-//                            highest_accepted_value = received_accepted_value;
-//                            message = updateMessage(message, highest_accepted_value);
-//                        }
-//                        trackerObject.get(maxRoundIdentifier).countPromises++;
-          } else {
-            trackerObject.get(maxRoundIdentifier).countPromises++;
-          }
         }
 
-      } catch (TException e) {
+      }
+      catch (TException e) {
         e.printStackTrace();
       }
 
@@ -554,17 +525,18 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
 
       for (FileSystemPaxos.Client paxosServer : paxosServers) {
         try {
-//                    String val = failSafeACCEPT(paxosServer, paxosIdentifier, message).get(1, TimeUnit.SECONDS);
           String val = paxosServer.ACCEPT(paxosIdentifier, message);
           logger.logInfo("RESPONSE FROM THE OTHER ACCEPTOR " + val);
-        } catch (TException e) {
+        }
+        catch (TException e) {
           e.printStackTrace();
         }
 
       }
-    } else {
+    }
+    else {
       logger.logInfo("PROMISE FOR THIS PID IS NOT POSSIBLE TRYING FOR THE HIGHER ONE " + maxRoundIdentifier);
-//      proposerHelper(message);
+      proposerHelper(message);
     }
   }
 
@@ -574,57 +546,6 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
   }
 
 
-  private Future<String> failSafePREPARE(final FileSystemPaxos.Client paxosServer, final double paxosIdentifier) {
-    ExecutorService executor = Executors.newCachedThreadPool();
-    Callable<String> task = new Callable<String>() {
-      public String call() {
-        try {
-          return paxosServer.PREPARE(paxosIdentifier);
-        } catch (TException e) {
-          logger.logInfo("SERVER OFFLINE");
-        }
-        return "OFFLINE:" + paxosIdentifier;
-      }
-    };
-    Future<String> future = executor.submit(task);
-    return future;
-  }
-
-  private Future<String> failSafeACCEPT(final FileSystemPaxos.Client paxosServer,
-                                        final double paxosIdentifier,
-                                        final String message) {
-    ExecutorService executor = Executors.newCachedThreadPool();
-    Callable<String> task = new Callable<String>() {
-      public String call() {
-        try {
-          return paxosServer.ACCEPT(paxosIdentifier, message);
-        } catch (TException e) {
-          logger.logInfo("SERVER OFFLINE");
-        }
-        return "OFFLINE:" + paxosIdentifier + message;
-      }
-    };
-    Future<String> future = executor.submit(task);
-    return future;
-  }
-
-  private Future<String> failSafeLEARN(final FileSystemPaxos.Client paxosServer,
-                                       final double paxosIdentifier,
-                                       final String message) {
-    ExecutorService executor = Executors.newCachedThreadPool();
-    Callable<String> task = new Callable<String>() {
-      public String call() {
-        try {
-          return paxosServer.LEARN(paxosIdentifier, message);
-        } catch (TException e) {
-          logger.logInfo("SERVER OFFLINE");
-        }
-        return "OFFLINE";
-      }
-    };
-    Future<String> future = executor.submit(task);
-    return future;
-  }
 
 
   @Override
