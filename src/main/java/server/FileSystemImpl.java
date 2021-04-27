@@ -180,7 +180,6 @@ public class FileSystemImpl implements FileSystem.Iface {
 
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 transport.close();
-
                 System.out.println("Client is shutting down, closing all sockets!");
             }));
         }

@@ -35,44 +35,6 @@ public class Client {
     this.hostName = hostName;
   }
 
-//  public void sendRequest() {
-//    try (TTransport transport = new TSocket(hostName, port)){
-//      transport.open();
-//
-//      TProtocol protocol = new TBinaryProtocol(transport);
-//      fileSystemClient = new FileSystem.Client(protocol);
-//
-//      ByteBuffer binaryArray;
-//      // TODO : Make user input absolute path.
-//      binaryArray = ByteBuffer.wrap(Files.readAllBytes(
-//              Paths.get("/home/soufianej/Documents/Courses/Building-scalable-distributed-systems/Projects/final-project/DistributedStorage/src/main/java/client/Test.txt")));
-//
-////      fileSystemClient.uploadFile("Test2.txt", binaryArray);
-//      ByteBuffer data = fileSystemClient.getFile("Test2.txt");
-////
-//      try (FileOutputStream stream = new FileOutputStream("Test5.txt")) {
-//        stream.write(data.array());
-//      } catch (IOException e) {
-//        e.printStackTrace();
-//      }
-//
-//
-////        fileSystemClient.deleteFile("Test.txt");
-//
-//      Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-//        transport.close();
-//
-//        System.out.println("Client is shutting down, closing all sockets!");
-//      }));
-//
-//    } catch (TApplicationException exception) {
-//      logger.logErr("Error received from server: " + exception.getMessage());
-//    } catch (TException | IOException e) {
-//      logger.logErr("Failure on the server side: " + e.getMessage());
-//      e.printStackTrace();
-//      System.exit(0); // triggers shutdown hook
-//    }
-//  }
 
   public void acceptRequests() {
     Scanner read = new Scanner(System.in);
@@ -145,6 +107,17 @@ public class Client {
           fileSystemClient.uploadFile(request.fileName, binaryArray);
         } catch (Exception e) {
           System.out.println(getCurrentTime() + " Upload failed");
+        }
+        break;
+      }
+      case "UPDATE": {
+        System.out.println(getCurrentTime() + " Received UPDATE " + request.fileName + " from " + request.filePath);
+        try {
+          binaryArray = ByteBuffer.wrap(Files.readAllBytes(
+                  Paths.get(request.filePath)));
+          fileSystemClient.updateFile(request.fileName, binaryArray);
+        } catch (Exception e) {
+          System.out.println(getCurrentTime() + " Update failed");
         }
         break;
       }

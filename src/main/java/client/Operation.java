@@ -3,7 +3,8 @@ package client;
 enum Operation {
   UPLOAD("UPLOAD"),
   GET("GET"),
-  DELETE("DELETE");
+  DELETE("DELETE"),
+  UPDATE("UPDATE");
 
   private final String name;
 

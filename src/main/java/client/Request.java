@@ -36,6 +36,9 @@ public class Request {
       case "DELETE": {
         request.operation = Operation.DELETE;
       }
+      case "UPDATE": {
+        request.operation = Operation.UPDATE;
+      }
     }
 
     request.fileName = requestData.get(1);
@@ -52,12 +55,11 @@ public class Request {
       return false;
 
     switch (requestData.get(0).toUpperCase()) {
-      case "UPLOAD": {
-        {
-          if (requestData.size() != 3)
-            return false;
-          break;
-        }
+      case "UPLOAD":
+      case "UPDATE": {
+        if (requestData.size() != 3)
+          return false;
+        break;
       }
       case "GET":
       case "DELETE": {
