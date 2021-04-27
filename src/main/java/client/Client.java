@@ -52,6 +52,7 @@ public class Client {
       System.out.println("UPLOAD: \"UPLOAD,<file_name>,<file_path>\"");
       System.out.println("GET: \"GET,<file_name>\"");
       System.out.println("DELETE: \"DELETE,<file_name>\"");
+      System.out.println("UPDATE \"UPDATE,<file_name>,<file_path>\"");
       System.out.println("quit or close to exit");
       System.out.println("-----------------------------------------------------------\n");
 
