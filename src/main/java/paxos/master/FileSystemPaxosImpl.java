@@ -74,6 +74,17 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
      */
     public FileSystemPaxosImpl(Logger logger) {
 
+
+
+        // Paxos Variables
+        this.maxRoundIdentifier = 1 + Math.random();
+        this.majority = servers.size()/2 + 1;
+        this.trackerObject = new HashMap<Double, variableCollection>();
+        this.paxosServers = getServers(servers);
+
+
+
+
         this.logger = logger;
         this.fileLocator = new ConcurrentHashMap<>();
         this.loadTracker = new ConcurrentHashMap<>();
@@ -87,8 +98,6 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
         this.majority = servers.size()/2 + 1;
         this.trackerObject = new HashMap<Double, variableCollection>();
         this.paxosServers = getServers(servers);
-
-
 
         this.logger = logger;
         this.fileLocator = new ConcurrentHashMap<>();

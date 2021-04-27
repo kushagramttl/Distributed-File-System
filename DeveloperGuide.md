@@ -8,7 +8,7 @@ Master server communication and paxos implementation
 to be consistent
 - Paxos in master server helps with that a commit on any one of the master servers
 will ensure that the rest of them also update their metadata
-- Once metadat is consistent or after the proposer in this case has achived the max consesnsu
+- Once metadata is consistent or after the proposer in this case has achived the max consesnsu
 it will initiate the actual process that is push to the database or storage
 - Paxos is just used for ensuring consistency across all the master servers
 - As of now recovery is not supported, it is assumed that if a server dies it stays dead
@@ -24,4 +24,4 @@ Files cannot exceed 16MB due to mongoDB constraint.
 
 Add this to your server program VM options:
 
- -Dmongodb.uri="mongodb+srv://admin:<password>>@cluster0.giyol.mongodb.net/myFirstDatabase?retryWrites=true&w=majority
+-Dmongodb.uri="mongodb+srv://admin:<password>>@cluster0.giyol.mongodb.net/myFirstDatabase?retryWrites=true&w=majority
