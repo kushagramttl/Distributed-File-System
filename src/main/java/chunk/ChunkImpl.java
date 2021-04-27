@@ -1,6 +1,10 @@
 package chunk;
 
 import Helper.Logger;
+import com.mongodb.MongoCommandException;
+import com.mongodb.ReadConcern;
+import com.mongodb.TransactionOptions;
+import com.mongodb.WriteConcern;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -10,9 +14,6 @@ import org.apache.thrift.TException;
 import org.bson.Document;
 import org.bson.types.Binary;
 import org.bson.types.ObjectId;
-
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
@@ -49,48 +50,89 @@ public class ChunkImpl implements Chunk.Iface {
 
     @Override
     public ByteBuffer getFile(String name) throws TException {
-
         try (MongoClient mongoClient = MongoClients.create(connectionString)) {
-            MongoDatabase db = mongoClient.getDatabase("FileSystem");
+            try (ClientSession session = mongoClient.startSession()) {
+                try {
+                    MongoDatabase db = mongoClient.getDatabase("FileSystem");
 
-            MongoCollection<Document> collection = db.getCollection(this.collectionName);
+                    MongoCollection<Document> collection = db.getCollection(this.collectionName);
 
-            Document file = collection.find(Filters.eq("filename", name)).first();
+                    logger.logInfo("Starting database transaction");
 
-            if (file == null)
-                throw new TApplicationException("File not found");
+                    session.startTransaction(TransactionOptions.builder().readConcern(ReadConcern.MAJORITY).build());
+                    Document file = collection.find(Filters.eq("filename", name)).first();
 
-            String filename = (String) file.get("filename");
-            Binary data = (Binary) file.get("data");
+                    if (file == null)
+                        throw new TApplicationException("File not found");
 
-            return ByteBuffer.wrap(data.getData());
+                    String filename = (String) file.get("filename");
+
+                    if (file.get("data") == null)
+                        throw new TApplicationException("File not found");
+
+                    Binary data = (Binary) file.get("data");
+
+                    logger.logInfo("Committing transaction to database");
+                    session.commitTransaction();
+                    return ByteBuffer.wrap(data.getData());
+                } catch (MongoCommandException e) {
+                    logger.logErr("Issue occurred while uploading the file. Aborting transaction...");
+                    session.abortTransaction();
+                }
+            }
         }
 
+        return null;
     }
 
     @Override
     public void deleteFile(String name) throws TException {
         try (MongoClient mongoClient = MongoClients.create(connectionString)) {
-            MongoDatabase db = mongoClient.getDatabase("FileSystem");
-            MongoCollection<Document> gradesCollection = db.getCollection(this.collectionName);
+            try (ClientSession session = mongoClient.startSession()) {
+                try {
+                    MongoDatabase db = mongoClient.getDatabase("FileSystem");
+                    MongoCollection<Document> gradesCollection = db.getCollection(this.collectionName);
 
-            DeleteResult result = gradesCollection.deleteOne(Filters.eq("filename", name));
+                    logger.logInfo("Starting database transaction");
 
-            System.out.println(result);
+                    session.startTransaction(TransactionOptions.builder().writeConcern(WriteConcern.MAJORITY).build());
+                    DeleteResult result = gradesCollection.deleteOne(Filters.eq("filename", name));
+
+                    logger.logInfo("Committing transaction to database");
+                    session.commitTransaction();
+                    System.out.println(result);
+                } catch (MongoCommandException e) {
+                    logger.logErr("Issue occurred while uploading the file. Aborting transaction...");
+                    session.abortTransaction();
+                }
+            }
         }
     }
 
     @Override
     public ByteBuffer getMetadata() throws TException {
         try (MongoClient mongoClient = MongoClients.create(connectionString)) {
-            MongoDatabase db = mongoClient.getDatabase("FileSystem");
-            MongoCollection<Document> collection = db.getCollection("Files");
+            try (ClientSession session = mongoClient.startSession()) {
+                try {
+                    MongoDatabase db = mongoClient.getDatabase("FileSystem");
+                    MongoCollection<Document> collection = db.getCollection("Files");
 
-            FindIterable<Document> docs = collection.find();
+                    logger.logInfo("Starting database transaction");
 
-            for (Document d :
-                    docs) {
-                System.out.println((String) d.get("filename"));
+                    session.startTransaction(TransactionOptions.builder().readConcern(ReadConcern.MAJORITY).build());
+                    FindIterable<Document> docs = collection.find();
+
+                    logger.logInfo("Committing transaction to database");
+                    session.commitTransaction();
+
+                    for (Document d :
+                            docs) {
+                        System.out.println((String) d.get("filename"));
+                    }
+                } catch (MongoCommandException e) {
+                    logger.logErr("Issue occurred while uploading the file. Aborting transaction...");
+                    session.abortTransaction();
+                }
             }
         }
 
@@ -100,24 +142,50 @@ public class ChunkImpl implements Chunk.Iface {
     @Override
     public void uploadFile(String name, ByteBuffer file) throws TException {
         try (MongoClient mongoClient = MongoClients.create(connectionString)) {
-            MongoDatabase db = mongoClient.getDatabase("FileSystem");
-            MongoCollection<Document> collection = db.getCollection(this.collectionName);
+            try (ClientSession session = mongoClient.startSession()) {
+                try {
+                    MongoDatabase db = mongoClient.getDatabase("FileSystem");
+                    MongoCollection<Document> collection = db.getCollection(this.collectionName);
 
-            Document data = new Document("_id", new ObjectId());
-            data.append("filename", name)
-                    .append("data", new Binary(file.array()));
+                    logger.logInfo("Starting database transaction");
 
-            collection.insertOne(data);
+                    session.startTransaction(TransactionOptions.builder().writeConcern(WriteConcern.MAJORITY).build());
+                    Document data = new Document("_id", new ObjectId());
+                    data.append("filename", name)
+                            .append("data", new Binary(file.array()));
+
+                    collection.insertOne(data);
+
+                    logger.logInfo("Committing transaction to database");
+                    session.commitTransaction();
+                } catch (MongoCommandException e) {
+                    logger.logErr("Issue occurred while uploading the file. Aborting transaction...");
+                    session.abortTransaction();
+                }
+            }
         }
     }
 
     @Override
     public void updateFile(String name, ByteBuffer file) throws TException {
         try (MongoClient mongoClient = MongoClients.create(connectionString)) {
-            MongoDatabase db = mongoClient.getDatabase("FileSystem");
-            MongoCollection<Document> collection = db.getCollection(this.collectionName);
+            try (ClientSession session = mongoClient.startSession()) {
+                try {
+                    MongoDatabase db = mongoClient.getDatabase("FileSystem");
+                    MongoCollection<Document> collection = db.getCollection(this.collectionName);
 
-            collection.updateOne(Filters.eq("filename", name), Updates.set("data", new Binary(file.array())));
+                    logger.logInfo("Starting database transaction");
+
+                    session.startTransaction(TransactionOptions.builder().writeConcern(WriteConcern.MAJORITY).build());
+                    collection.updateOne(Filters.eq("filename", name), Updates.set("data", new Binary(file.array())));
+
+                    logger.logInfo("Committing transaction to database");
+                    session.commitTransaction();
+                } catch (MongoCommandException e) {
+                    logger.logErr("Issue occurred while uploading the file. Aborting transaction...");
+                    session.abortTransaction();
+                }
+            }
         }
     }
 }
