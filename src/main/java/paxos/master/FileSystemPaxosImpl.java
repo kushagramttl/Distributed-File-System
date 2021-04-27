@@ -12,19 +12,60 @@ import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
 import org.bson.Document;
 import org.bson.types.ObjectId;
-import server.FileSystem;
 
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.*;
 
 
-class variableCollection {
+class PaxosMessage {
+    String response;
+    String type;
+    String name;
+    int chunkport;
+    int ckey;
+    int cvalue;
+
+    public PaxosMessage() {
+        this.response = "";
+        this.type = "";
+        this.name = "";
+        this.cvalue = 1;
+        this.chunkport = 1;
+        this.ckey = 1;
+
+    }
+
+    public String toString() {
+        return response + ":"
+                + type + ":"
+                + name + ":"
+                + chunkport + ":"
+                + ckey + ":"
+                + cvalue + ":";
+    }
+
+    public PaxosMessage(String message) {
+        String properties[] = message.split(":");
+        this.response = properties[0];
+        this.type = properties[1];
+        this.name = properties[2];
+        this.chunkport = Integer.parseInt(properties[3]);
+        this.ckey = Integer.parseInt(properties[3]);
+        this.cvalue = Integer.parseInt(properties[3]);
+
+    }
+
+
+}
+
+class VariableCollection {
     public boolean proposal_accepted = false;
     public double accepted_ID = -1;
     public String accepted_VALUE = null;
     public int countPromises = 0;
     public int countAccepts = 0;
+
 }
 
 
@@ -39,11 +80,15 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
      */
     private double maxRoundIdentifier;
     private int majority;
-    private Map<Double, variableCollection> trackerObject;
+    private Map<Double, VariableCollection> trackerObject;
     private List<FileSystemPaxos.Client> paxosServers;
     private int port;
 
 
+
+    // Integration variable
+    private boolean amRequested;
+    private ByteBuffer fileToUpload;
 
     /**
      * The logger object.
@@ -84,7 +129,7 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
         // Paxos Variables
         this.maxRoundIdentifier = 1 + Math.random();
         this.majority = servers.size()/2 + 1;
-        this.trackerObject = new HashMap<Double, variableCollection>();
+        this.trackerObject = new HashMap<Double, VariableCollection>();
         this.paxosServers = getServers(servers);
 
 
@@ -95,7 +140,14 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
         this.replicaTracker = new ConcurrentHashMap<>();
         retrieveMetadata();
 
+        // Integration variable
+        this.amRequested = false;
+        this.fileToUpload = null;
+
+
     }
+
+
 
     private List<FileSystemPaxos.Client> getServers(List<ServerIdentifier> paxosServerIdentifiers) {
 
@@ -160,14 +212,6 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
 
 
     /**
-     * Method used to unmarshal the data related to the servers and create objects from it
-     * @param paxosServerIdentifiers
-     * @return
-     */
-
-
-
-    /**
      * Backs up both the data of the fileLocator and loadTracker maps in the database
      */
     private void backupMetadata(){
@@ -225,8 +269,47 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
         }
     }
 
+
+    public void uploadFileHelper(String name, int ckey, int cvalue) {
+        loadTracker.replace(ckey, cvalue + 1);
+        fileLocator.put(name, ckey);
+
+        if(amRequested) {
+            uploadFileHelperMongo(name, ckey, cvalue, fileToUpload);
+        }
+
+    }
+
+    public void uploadFileHelperMongo(String name, int ckey, int cvalue, ByteBuffer file) {
+        try (TTransport transport = new TSocket("localhost", ckey)) {
+            transport.open();
+            TProtocol protocol = new TBinaryProtocol(transport);
+            chunkClient = new Chunk.Client(protocol);
+            try {
+                chunkClient.uploadFile(name, file);
+            }
+            catch (TException e) {
+                e.printStackTrace();
+            }
+
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                transport.close();
+
+                System.out.println("Client is shutting down, closing all sockets!");
+            }));
+
+            backupMetadata();
+        }
+        catch (TTransportException e) {
+            e.printStackTrace();
+        }
+    }
+
     @Override
     public void uploadFile(String name, ByteBuffer file) throws TException {
+
+        amRequested = true;
+        fileToUpload = file;
 
         Map.Entry<Integer, Integer> chunkServer = Collections.min(loadTracker.entrySet(),
                 new Comparator<Map.Entry<Integer, Integer>>() {
@@ -236,29 +319,43 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
                 }
         );
 
-        /*********************************************************************************************************/
+        int ckey = chunkServer.getKey();
+        int cvalue = chunkServer.getValue();
 
-        logger.logInfo("REQUEST - UPLOAD; CHUNKSERV => " + chunkServer.getKey() + " - FILE => " + name + " - SIZE => " + file.array().length * 1000 + " KB");
-        loadTracker.replace(chunkServer.getKey(), chunkServer.getValue() + 1);
-        fileLocator.put(name, chunkServer.getKey());
+        PaxosMessage message = new PaxosMessage();
+        message.type = "PUT";
+        message.ckey = ckey;
+        message.cvalue = cvalue;
 
-        /***********************************************************************************************************/
+        proposerHelper(message.toString());
 
-        try (TTransport transport = new TSocket("localhost", chunkServer.getKey())) {
-            transport.open();
-            TProtocol protocol = new TBinaryProtocol(transport);
-            chunkClient = new Chunk.Client(protocol);
-            chunkClient.uploadFile(name, file);
+        logger.logInfo("REQUEST - UPLOAD; CHUNKSERV => " +
+                chunkServer.getKey() + " - FILE => " +
+                name + " - SIZE => " +
+                file.array().length * 1000 + " KB");
 
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                transport.close();
-
-                System.out.println("Client is shutting down, closing all sockets!");
-            }));
+        amRequested  = false;
 
 
-            backupMetadata();
-        }
+//        try {
+//            Thread.sleep(10000);
+//        }
+//        catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
+//
+//        if(amRequested && achievedConsensus) {
+//            uploadFileHelperMongo(name, ckey, cvalue, file);
+//        }
+
+
+
+//        flushIntegrationVariable();
+
+
+
+
+
     }
 
     @Override
@@ -273,7 +370,6 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
 
             TProtocol protocol = new TBinaryProtocol(transport);
             chunkClient = new Chunk.Client(protocol);
-
             chunkClient.updateFile(name, file);
 
             logger.logInfo("REQUEST - UPDATE; CHUNKSERV => " + chunkPort + " - FILE => " + name + " - SIZE => " + file.array().length * 1000 + " KB");
@@ -287,33 +383,22 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
         }
     }
 
-    @Override
-    public void deleteFile(String name) throws TException {
-        if (!fileLocator.containsKey(name)){
-            throw new TApplicationException("File not found");
-        }
-
-
-        /***************************************************************************/
-        int chunkPort = fileLocator.get(name);
-
+    public void deleteFileHelper(String name, int chunkPort) {
         loadTracker.replace(chunkPort, loadTracker.get(chunkPort) - 1);
         fileLocator.remove(name);
+        deleteFileHelperMongo(name,chunkPort);
 
+    }
 
-        /***************************************************************************/
-
+    private void deleteFileHelperMongo(String name, int chunkPort) {
         try (TTransport transport = new TSocket("localhost", chunkPort)) {
             transport.open();
-
             TProtocol protocol = new TBinaryProtocol(transport);
             chunkClient = new Chunk.Client(protocol);
-
             chunkClient.deleteFile(name);
-            logger.logInfo("REQUEST - DELETE; CHUNKSERV => " + chunkPort + " - FILE => " + name);
-
-            loadTracker.replace(chunkPort, loadTracker.get(chunkPort) - 1);
-            fileLocator.remove(name);
+//            logger.logInfo("REQUEST - DELETE; CHUNKSERV => " + chunkPort + " - FILE => " + name);
+//            loadTracker.replace(chunkPort, loadTracker.get(chunkPort) - 1);
+//            fileLocator.remove(name);
             backupMetadata();
 
 
@@ -323,7 +408,40 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
                 System.out.println("Client is shutting down, closing all sockets!");
             }));
         }
+        catch (TTransportException e) {
+            e.printStackTrace();
+        }
+        catch (TException e) {
+            e.printStackTrace();
+        }
+
     }
+
+    @Override
+    public void deleteFile(String name) throws TException {
+
+        amRequested = true;
+
+        if (!fileLocator.containsKey(name)){
+            throw new TApplicationException("File not found");
+        }
+        int chunkPort = fileLocator.get(name);
+
+        /***************************************************************************/
+
+        PaxosMessage message = new PaxosMessage();
+        message.type = "DELETE";
+        message.name = name;
+        message.chunkport = chunkPort;
+
+        proposerHelper(message.toString());
+
+        /***************************************************************************/
+
+        amRequested = false;
+
+    }
+
 
     @Override
     public boolean registerChunk(int port, int replicaPort) throws TException {
@@ -355,7 +473,7 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
         double paxosIdentifier = maxRoundIdentifier + 1 + Math.random();
 
         // Map needed to record the state for each paxosIdentifier
-        trackerObject.put(paxosIdentifier, new variableCollection());
+        trackerObject.put(paxosIdentifier, new VariableCollection());
         logger.logInfo("TRACKER OBJECT CREATED " + trackerObject.toString());
         logger.logInfo("CURRENT maxRoundIdentifier" + " " + maxRoundIdentifier);
         logger.logInfo("CONSENSUS paxosIdentifier" + " " + paxosIdentifier);
@@ -380,25 +498,29 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
 
             try {
 
-                responseFromAcceptor = failSafePREPARE(paxosServer, paxosIdentifier).get(1, TimeUnit.SECONDS);
+
+
+                responseFromAcceptor = paxosServer.PREPARE(paxosIdentifier);
                 responses = responseFromAcceptor.split(":");
                 responseType = responses[0];
-                responseValue = responses[1];
 
-                logger.logInfo("RESPONSE FOR THE PROMISE REQUEST TO THE SERVER " + responseType);
+                logger.logInfo("RESPONSE FOR THE PROMISE REQUEST TO THE SERVER " + responseFromAcceptor);
                 if(responseType.equals("PROMISE")) {
                     // A way of tell that you received accepted_id and accepted_value along with your promise
                     if(responses.length == 4) {
                         // The acceptor previously accepted a value
-                        logger.logInfo("AN ACCEPTED VALUE IS FOUND YOUR REQUEST WILL BE IGNORED");
+                        logger.logInfo("AN ACCEPTED VALUE IS FOUND YOUR REQUEST");
                         trackerObject.get(maxRoundIdentifier).countPromises++;
-                        String received_accepted_id = responses[2];
-                        String received_accepted_value = responses[3];
-                        if(Float.parseFloat(received_accepted_id) > Float.parseFloat(highest_accepted_id)) {
-                            highest_accepted_value = received_accepted_value;
-                            message = updateMessage(message, highest_accepted_value);
-                        }
-                        trackerObject.get(maxRoundIdentifier).countPromises++;
+
+//                        String received_accepted_id = responses[2];
+//                        String received_accepted_value = responses[3];
+//
+//                        message = received_accepted_value;
+//                        if(Float.parseFloat(received_accepted_id) > Float.parseFloat(highest_accepted_id)) {
+//                            highest_accepted_value = received_accepted_value;
+//                            message = updateMessage(message, highest_accepted_value);
+//                        }
+//                        trackerObject.get(maxRoundIdentifier).countPromises++;
                     }
                     else {
                         trackerObject.get(maxRoundIdentifier).countPromises++;
@@ -407,14 +529,8 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
 
             }
 
-            catch (InterruptedException e) {
-                logger.logInfo("ACCEPTOR SEEMS OFFLINE DIDNT RETURN PROMISE");
-            }
-            catch (ExecutionException e) {
-                logger.logInfo("ACCEPTOR SEEMS OFFLINE DIDNT RETURN PROMISE");
-            }
-            catch (TimeoutException e) {
-                logger.logInfo("ACCEPTOR TIMED OUT");
+            catch (TException e) {
+                e.printStackTrace();
             }
 
         }
@@ -434,17 +550,12 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
 
             for(FileSystemPaxos.Client paxosServer : paxosServers) {
                 try {
-
-                    String val = failSafeACCEPT(paxosServer, paxosIdentifier, message).get(1, TimeUnit.SECONDS);
+//                    String val = failSafeACCEPT(paxosServer, paxosIdentifier, message).get(1, TimeUnit.SECONDS);
+                    String val = paxosServer.ACCEPT(paxosIdentifier, message);
                     logger.logInfo("RESPONSE FROM THE OTHER ACCEPTOR " + val);
                 }
-
-                catch (InterruptedException e) {
-                    logger.logInfo("ACCEPTOR SEEMS OFFLINE DIDNT RETURN PROMISE");
-                } catch (ExecutionException e) {
-                    logger.logInfo("ACCEPTOR SEEMS OFFLINE DIDNT RETURN PROMISE");
-                } catch (TimeoutException e) {
-                    logger.logInfo("ACCEPTOR TIMED OUT");
+                catch (TException e) {
+                    e.printStackTrace();
                 }
 
             }
@@ -526,7 +637,7 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
             logger.logInfo("PAXOSID RECEIVED " + paxosIdentifier);
             // Data structure declaration step as the acceptor may not have initialize the values
             if(!trackerObject.containsKey(paxosIdentifier)) {
-                trackerObject.put(paxosIdentifier,new variableCollection());
+                trackerObject.put(paxosIdentifier,new VariableCollection());
                 logger.logInfo("TRACKER OBJECT CREATED " + trackerObject.toString());
             }
 
@@ -556,42 +667,30 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
     }
 
     @Override
-    public String ACCEPT(double paxosIdentifier, String value){
+    public String ACCEPT(double paxosIdentifier, String message){
 
             logger.logInfo("INSIDER ACCEPT");
             logger.logInfo("PAXOS ID RECEIVED IN ACCEPT " + paxosIdentifier);
-            logger.logInfo("VALUE TO BE ACCEPTED " + value);
+            logger.logInfo("VALUE TO BE ACCEPTED " + message);
 
             if(paxosIdentifier == this.maxRoundIdentifier) {
                 this.trackerObject.get(paxosIdentifier).proposal_accepted = true;
                 this.trackerObject.get(paxosIdentifier).accepted_ID = paxosIdentifier;
-                this.trackerObject.get(paxosIdentifier).accepted_VALUE = value;
+                this.trackerObject.get(paxosIdentifier).accepted_VALUE = message;
 
-                logger.logInfo("INITIATING LEARN ON THE LOCAL LEARNER FOR " + paxosIdentifier + " " + value);
-                LEARN(paxosIdentifier,value);
+                logger.logInfo("INITIATING LEARN ON THE LOCAL LEARNER FOR " + paxosIdentifier + " " + message);
+                LEARN(paxosIdentifier,message);
                 int i = 0;
                 for(FileSystemPaxos.Client paxosServer : paxosServers) {
                     i++;
                     try {
-
-                        // paxosServer.LEARN(paxosIdentifier,value);
-                        failSafeLEARN(paxosServer, paxosIdentifier, value).get(1, TimeUnit.SECONDS);
-                        logger.logInfo("SENT ACCEPTANCE TO A LEARNER " + i + " " + paxosIdentifier + " " + value);
+                        paxosServer.LEARN(paxosIdentifier,message);
+                        logger.logInfo("SENT ACCEPTANCE TO A LEARNER " + i + " " + paxosIdentifier + " " + message);
                     }
-                    // Uncomment to use normally
-                    // catch (TException e) {
-                    // logger.logInfo("UNABLE TO CONTACT THE LEARNER " + i);
-                    //}
-                    catch (InterruptedException e) {
-                        logger.logInfo("ACCEPTOR SEEMS OFFLINE DIDNT RETURN PROMISE");
 
-                    }
-                    catch (ExecutionException e) {
-                        logger.logInfo("ACCEPTOR SEEMS OFFLINE DIDNT RETURN PROMISE");
 
-                    }
-                    catch (TimeoutException e) {
-                        logger.logInfo("ACCEPTOR TIMED OUT");
+                    catch (TException e) {
+                        e.printStackTrace();
                     }
                 }
 
@@ -605,25 +704,27 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
     }
 
     @Override
-    public String LEARN(double paxosIdentifier, String value){
+    public String LEARN(double paxosIdentifier, String message){
 
 
             if(trackerObject.containsKey(paxosIdentifier)) {
                 logger.logInfo("INSIDE LEARN");
                 logger.logInfo("RECEIVED PAXOS ID " + paxosIdentifier);
 
-                logger.logInfo("VALUE TO BE LEARNED " + value);
+                logger.logInfo("VALUE TO BE LEARNED " + message);
                 trackerObject.get(paxosIdentifier).countAccepts++;
                 int val = trackerObject.get(paxosIdentifier).countAccepts;
                 logger.logInfo("UPDATED COUNT OF ACCEPTS " + val);
                 if (this.trackerObject.get(paxosIdentifier).countAccepts == majority) {
                     logger.logInfo("CALL TO THE RELEVANT OPERATION WHEN MAJORITY IS ACHIVED " + val);
                     trackerObject.get(paxosIdentifier).proposal_accepted = false;
-                    this.operation(value);
+
+                    this.operation(new PaxosMessage(message));
 
                     logger.logInfo("LEARN OPERATION COMPLETED " + val);
                     return "LEARNED";
-                } else if (this.trackerObject.get(paxosIdentifier).countAccepts > majority) {
+                }
+                else if (this.trackerObject.get(paxosIdentifier).countAccepts > majority) {
                     return "IGNORED AS THE MAJORITY EXCEEDED";
                 } else {
                     return "IGNORED";
@@ -632,44 +733,20 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface{
         return "LEARN";
     }
 
-    private String operation(String value) {
-//        String[] input = value.split(":");
-//        String operation = input[0];
-//
-//        logger.logInfo("PERFORM OPERATION " + value);
-//        if(operation.equals("PUT")) {
-//            logger.logInfo("PERFORM PUT");
-//            String keynode = input[1];
-//            String valuenode = input[2];
-//            logger.logInfo("PERFORM PUT FOR KEY " + keynode);
-//            logger.logInfo("PERFORM PUT FOR VALUE " + valuenode);
-//            this.doPUT(keynode, valuenode);
-//        }
-//        else if(operation.equals("DELETE")) {
-//            logger.logInfo("PERFORM DELETE");
-//            String keynode = input[1];
-//            logger.logInfo("PERFORM PUT FOR DELETE " + keynode);
-//            this.doDelete(keynode);
-//        }
-//        else {
-//            logger.logInfo("INVALID OPERATION REQUESTED");
-//        }
+    private void operation(PaxosMessage message) {
 
-        return "DONE";
+        if (message.type.equals("PUT")) {
+            uploadFileHelper(message.name, message.ckey, message.cvalue);
+        }
+        else if (message.type.equals(("DELETE"))) {
+            deleteFileHelper(message.name, message.chunkport);
+        }
+        else {
+            logger.logInfo("INVALID OPERATION MESSAGE");
+        }
+
+
     }
-
-    private String doPUT(String key, String value) {
-//        this.store.put(key, value);
-//        logger.logInfo("UPDATED STORE VALUE " + this.store.toString());
-        return "DONE";
-    }
-
-    private String doDelete(String key) {
-//        this.store.remove(key);
-//        logger.logInfo("UPDATED STORE VALUE " + this.store.toString());
-        return "DONE";
-    }
-
 
 
 }
