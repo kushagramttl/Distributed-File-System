@@ -42,7 +42,7 @@ public class Server {
 
         try (TServerTransport serverTransport = new TServerSocket(port)) {
             List<ServerIdentifier> servers = getServerIdentifer();
-            fileSystem = new FileSystemPaxosImpl(logger, servers);
+            fileSystem = new FileSystemPaxosImpl(logger, servers, port);
             processor = new FileSystemPaxos.Processor<FileSystemPaxosImpl>(fileSystem);
 
             TServer server = new TThreadPoolServer(new TThreadPoolServer.Args(serverTransport).processor(processor));
@@ -54,7 +54,8 @@ public class Server {
                 serverTransport.close();
                 System.out.println("Server is shutting down, closing all sockets!");
             }));
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             e.printStackTrace();
         }
     }

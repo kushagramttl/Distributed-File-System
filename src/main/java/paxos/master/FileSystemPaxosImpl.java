@@ -141,9 +141,10 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
     retrieveMetadata();
   }
 
-  public FileSystemPaxosImpl(Logger logger, List<ServerIdentifier> servers) {
+  public FileSystemPaxosImpl(Logger logger, List<ServerIdentifier> servers, int port) {
 
-    // Normal Variables
+    // Normal
+
     this.logger = logger;
     this.fileLocator = new ConcurrentHashMap<>();
     this.loadTracker = new ConcurrentHashMap<>();
@@ -154,6 +155,7 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
     this.majority = servers.size() / 2 + 1;
     this.trackerObject = new HashMap<Double, VariableCollection>();
     this.paxosServers = getServers(servers);
+    this.port = port;
 
 
     retrieveMetadata();
@@ -185,7 +187,8 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
           paxosClient = new FileSystemPaxos.Client(protocol);
           logger.logInfo("CONNECTED TO THE MASTER SERVER " + host + " " + port);
           clients.add(paxosClient);
-        } catch (TTransportException e) {
+        }
+        catch (TTransportException e) {
           logger.logInfo("ONE FELLOW SERVER GOT DISCONNECTED");
           e.printStackTrace();
         }
@@ -303,13 +306,13 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
       chunkClient = new Chunk.Client(protocol);
       try {
         chunkClient.uploadFile(name, file);
-      } catch (TException e) {
+      }
+      catch (TException e) {
         e.printStackTrace();
       }
 
       Runtime.getRuntime().addShutdownHook(new Thread(() -> {
         transport.close();
-
         System.out.println("Client is shutting down, closing all sockets!");
       }));
 
@@ -384,8 +387,6 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
   public void deleteFileHelper(String name, int chunkPort) {
     loadTracker.replace(chunkPort, loadTracker.get(chunkPort) - 1);
     fileLocator.remove(name);
-
-
     deleteFileHelperMongo(name, chunkPort);
 
   }
@@ -397,7 +398,6 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
       chunkClient = new Chunk.Client(protocol);
       chunkClient.deleteFile(name);
       backupMetadata();
-
 
       Runtime.getRuntime().addShutdownHook(new Thread(() -> {
         transport.close();
@@ -451,7 +451,8 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
         logger.logInfo("REQUEST - REGISTER CHUNK; PORT => " + port);
       } else
         logger.logInfo("WARNING - tried to register already registered chunk port");
-    } else { // is a replica
+    }
+    else { // is a replica
       if (replicaTracker.containsKey(replicaPort)) {
         toReturn = replicaTracker.get(replicaPort).add(port);
         if (!toReturn)
@@ -516,7 +517,6 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
 
     int promises = trackerObject.get(paxosIdentifier).countPromises;
 
-
     // If promises form a  majority
     if (promises >= majority) {
       logger.logInfo("CALL TO THE LOCAL ACCEPTOR");
@@ -534,6 +534,7 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
 
       }
     }
+
     else {
       logger.logInfo("PROMISE FOR THIS PID IS NOT POSSIBLE TRYING FOR THE HIGHER ONE " + maxRoundIdentifier);
       proposerHelper(message);
@@ -544,8 +545,6 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
     String[] arr = message.split(":");
     return arr[0] + value;
   }
-
-
 
 
   @Override
@@ -607,7 +606,8 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
       }
 
       return "ACCEPTED " + paxosIdentifier;
-    } else {
+    }
+    else {
       return "IGNORED " + paxosIdentifier;
     }
 
@@ -616,11 +616,9 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
   @Override
   public String LEARN(double paxosIdentifier, String message) {
 
-
     if (trackerObject.containsKey(paxosIdentifier)) {
       logger.logInfo("INSIDE LEARN");
       logger.logInfo("RECEIVED PAXOS ID " + paxosIdentifier);
-
       logger.logInfo("VALUE TO BE LEARNED " + message);
       trackerObject.get(paxosIdentifier).countAccepts++;
       int val = trackerObject.get(paxosIdentifier).countAccepts;
@@ -633,9 +631,11 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
 
         logger.logInfo("LEARN OPERATION COMPLETED " + val);
         return "LEARNED";
-      } else if (this.trackerObject.get(paxosIdentifier).countAccepts > majority) {
+      }
+      else if (this.trackerObject.get(paxosIdentifier).countAccepts > majority) {
         return "IGNORED AS THE MAJORITY EXCEEDED";
-      } else {
+      }
+      else {
         return "IGNORED";
       }
     }
@@ -646,9 +646,11 @@ public class FileSystemPaxosImpl implements FileSystemPaxos.Iface {
 
     if (message.type.equals("PUT")) {
       uploadFileHelper(message.name, message.ckey, message.cvalue);
-    } else if (message.type.equals(("DELETE"))) {
+    }
+    else if (message.type.equals(("DELETE"))) {
       deleteFileHelper(message.name, message.chunkport);
-    } else {
+    }
+    else {
       logger.logInfo("INVALID OPERATION MESSAGE");
     }
 
