@@ -33,7 +33,15 @@ java -jar Client.jar <master_server_address> <server_port_number>
      If the chunk is the main chunk, the main_chunk_port = -1       
 
  
-
+These should be run in the following order: 
+1. MasterServer 1
+2. MasterServer 2
+3. PortDiscovery
+4. ChunkServer 1
+5. ChunkServer 2
+6. ChunkServer 3
+7. ChunkServer Replica
+8. Client
 
 
 The chunk server can be a replica chunk server or the main chunk server.
