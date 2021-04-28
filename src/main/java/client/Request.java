@@ -35,9 +35,11 @@ public class Request {
       }
       case "DELETE": {
         request.operation = Operation.DELETE;
+        break;
       }
       case "UPDATE": {
         request.operation = Operation.UPDATE;
+        break;
       }
     }
 
