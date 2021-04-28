@@ -1,0 +1,17 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="MasterServer1" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="server.Server" />
+    <module name="DistributedStorage" />
+    <option name="PROGRAM_PARAMETERS" value="9100" />
+    <option name="VM_PARAMETERS" value="-Dmongodb.uri=&quot;mongodb+srv://admin:admin@cluster0.giyol.mongodb.net/myFirstDatabase?retryWrites=true&amp;w=majority" />
+    <extension name="coverage">
+      <pattern>
+        <option name="PATTERN" value="server.*" />
+        <option name="ENABLED" value="true" />
+      </pattern>
+    </extension>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

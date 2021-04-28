@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Chunk1Replica" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="chunk.ChunkServer" />
+    <module name="DistributedStorage" />
+    <option name="PROGRAM_PARAMETERS" value="9095 9091 36000" />
+    <option name="VM_PARAMETERS" value="-Dmongodb.uri=&quot;mongodb+srv://admin:admin@cluster0.giyol.mongodb.net/myFirstDatabase?retryWrites=true&amp;w=majority" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
