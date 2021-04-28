@@ -60,6 +60,9 @@ public class FileSystemImpl implements FileSystem.Iface {
         this.loadTracker = new ConcurrentHashMap<>();
         this.replicaTracker = new ConcurrentHashMap<>();
         retrieveMetadata();
+        for (int port : loadTracker.keySet()){
+            replicaTracker.put(port, new HashSet<>());
+        }
     }
 
 
@@ -81,7 +84,7 @@ public class FileSystemImpl implements FileSystem.Iface {
                     for (Document doc : docs) {
                         fileLocator.put((String) doc.get("filename"), (Integer) doc.get("chunk"));
                         loadTracker.put((Integer) doc.get("chunk"), (Integer) doc.get("chunk size"));
-                        replicaTracker.put((Integer) doc.get("chunk"), new HashSet<>());
+
                     }
                 } catch (MongoCommandException e) {
                     logger.logErr("Issue occurred while fetching metadata. Aborting transaction...");
@@ -129,6 +132,8 @@ public class FileSystemImpl implements FileSystem.Iface {
             throw new TApplicationException("File not found");
         }
 
+        retrieveMetadata();
+
         int chunkPort = fileLocator.get(name);
         chunkPort = getReplicaChunkPort(chunkPort);
 
@@ -165,8 +170,7 @@ public class FileSystemImpl implements FileSystem.Iface {
             }
         });
 
-        int chunkPort = chunkServer.getKey();
-        chunkPort = getReplicaChunkPort(chunkPort);
+        int chunkPort = getReplicaChunkPort(chunkServer.getKey());
 
         logger.logInfo("Contacting the chunk server: " + chunkPort);
 
@@ -228,8 +232,7 @@ public class FileSystemImpl implements FileSystem.Iface {
         if (!fileLocator.containsKey(name)) {
             throw new TApplicationException("File not found");
         }
-        int chunkPort = fileLocator.get(name);
-        chunkPort = getReplicaChunkPort(chunkPort);
+        int chunkPort = getReplicaChunkPort(fileLocator.get(name));
 
         logger.logInfo("Contacting the chunk server: " + chunkPort);
 
@@ -242,7 +245,7 @@ public class FileSystemImpl implements FileSystem.Iface {
             chunkClient.deleteFile(name);
             logger.logInfo("REQUEST - DELETE; CHUNKSERV => " + chunkPort + " - FILE => " + name);
 
-            loadTracker.replace(chunkPort, loadTracker.get(chunkPort) - 1);
+            loadTracker.replace(fileLocator.get(name), loadTracker.get(fileLocator.get(name)) - 1);
             fileLocator.remove(name);
             backupMetadata();
 
@@ -293,11 +296,12 @@ public class FileSystemImpl implements FileSystem.Iface {
             transport.open();
         } catch (TTransportException e) {
             logger.logInfo("WARNING - CHUNKSERV => " + chunkPort + " is not responding, contacting replica...");
-            if (replicaTracker.get(chunkPort).isEmpty())
+            if (replicaTracker.get(chunkPort).size() == 0)
                 throw new TApplicationException("No copy of the requested data has been found");
 
             for (int replicaPort :
                     replicaTracker.get(chunkPort)) {
+
                 try (TTransport transport = new TSocket("localhost", replicaPort)) {
                     transport.open();
                     chunkPort = replicaPort;
