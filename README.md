@@ -31,7 +31,7 @@ The chunk server can be a replica chunk server or the main chunk server.
 
 If the chunk is the main chunk, the main\_chunk\_port = -1
 
-The connection\_string needs to be- "mongodb+srv://admin:admin@cluster0.giyol.mongodb.net/myFirstDatabase?retryWrites=true&amp;w=majority"
+The connection\_string provided by mongodb
 
 If you face any issue while executing the  files, please contact us and we will try our best to solve them.
 
