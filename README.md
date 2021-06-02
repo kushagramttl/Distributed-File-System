@@ -26,8 +26,6 @@ These should be run in the following order:
 
 
 The chunk server can be a replica chunk server or the main chunk server.
- Thus, the command structure is:
-“mongodb+srv://admin:admin@cluster0.giyol.mongodb.net/myFirstDatabase?retryWrites=true&w=majority”
 
 If the chunk is the main chunk, the main\_chunk\_port = -1
 
